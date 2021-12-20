@@ -1,26 +1,28 @@
-from posts.models import Post, Group, Comment
+from posts.models import Comment, Group, Post
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.mixins import (CreateModelMixin, DestroyModelMixin,
+                                   ListModelMixin, RetrieveModelMixin,
+                                   UpdateModelMixin)
 
-from .serializers import PostSerializer, GroupSerializer, CommentSerializer
+from .permissions import AuthorOrReadOnly
+from .serializers import CommentSerializer, GroupSerializer, PostSerializer
 
 
-class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all()
-    serializer_class = PostSerializer
-
-    def perform_update(self, serializer):
-        if serializer.instance.author != self.request.user:
-            raise PermissionDenied('Изменение чужого контента запрещено!')
-        super(PostViewSet, self).perform_update(serializer)
-
-    def perform_destroy(self, serializer):
-        if serializer.author != self.request.user:
-            raise PermissionDenied('Удаление чужого контента запрещено!')
-        super(PostViewSet, self).perform_destroy(serializer)
+class CreateUpdateDestroyMixin(CreateModelMixin,
+                               DestroyModelMixin,
+                               UpdateModelMixin,
+                               ListModelMixin,
+                               RetrieveModelMixin,
+                               viewsets.GenericViewSet):
+    permission_classes = [AuthorOrReadOnly]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+
+class PostViewSet(CreateUpdateDestroyMixin):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
 
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,23 +30,12 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GroupSerializer
 
 
-class CommentViewSet(viewsets.ModelViewSet):
+class CommentViewSet(CreateUpdateDestroyMixin):
     serializer_class = CommentSerializer
 
     def get_queryset(self):
-        post_id = self.kwargs.get("post_id")
-        new_queryset = Comment.objects.filter(post=post_id)
-        return new_queryset
-
-    def perform_update(self, serializer):
-        if serializer.instance.author != self.request.user:
-            raise PermissionDenied('Изменение чужого контента запрещено!')
-        super(CommentViewSet, self).perform_update(serializer)
-
-    def perform_destroy(self, serializer):
-        if serializer.author != self.request.user:
-            raise PermissionDenied('Удаление чужого контента запрещено!')
-        super(CommentViewSet, self).perform_destroy(serializer)
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        post_id = self.kwargs.get('post_id')
+        if Post.objects.filter(pk=post_id):
+            new_queryset = Comment.objects.filter(post=post_id)
+            return new_queryset
+        return []
