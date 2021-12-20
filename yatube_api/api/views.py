@@ -1,23 +1,13 @@
-from posts.models import Comment, Group, Post
+from django.shortcuts import get_object_or_404
+from posts.models import Comment
+from posts.models import Group
+from posts.models import Post
 from rest_framework import viewsets
-from rest_framework.mixins import (CreateModelMixin, DestroyModelMixin,
-                                   ListModelMixin, RetrieveModelMixin,
-                                   UpdateModelMixin)
 
-from .permissions import AuthorOrReadOnly
-from .serializers import CommentSerializer, GroupSerializer, PostSerializer
-
-
-class CreateUpdateDestroyMixin(CreateModelMixin,
-                               DestroyModelMixin,
-                               UpdateModelMixin,
-                               ListModelMixin,
-                               RetrieveModelMixin,
-                               viewsets.GenericViewSet):
-    permission_classes = [AuthorOrReadOnly]
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+from .mixins import CreateUpdateDestroyMixin
+from .serializers import CommentSerializer
+from .serializers import GroupSerializer
+from .serializers import PostSerializer
 
 
 class PostViewSet(CreateUpdateDestroyMixin):
@@ -35,7 +25,6 @@ class CommentViewSet(CreateUpdateDestroyMixin):
 
     def get_queryset(self):
         post_id = self.kwargs.get('post_id')
-        if Post.objects.filter(pk=post_id):
+        if get_object_or_404(Post, pk=post_id):
             new_queryset = Comment.objects.filter(post=post_id)
             return new_queryset
-        return []
